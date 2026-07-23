@@ -1,11 +1,13 @@
 FROM node:20-alpine
 
-RUN corepack enable
+RUN corepack enable \
+    && corepack prepare pnpm@9.15.4 --activate
 
 WORKDIR /app
 
-COPY apps/web/package.json apps/web/pnpm-lock.yaml* ./
-RUN pnpm install
+COPY apps/web/package.json ./
+
+RUN pnpm install --no-frozen-lockfile
 
 COPY apps/web ./
 
