@@ -29,7 +29,7 @@ Esta base incluye:
 Para desarrollo local sin Docker:
 
 - Python 3.12.13
-- uv 0.11.16
+- uv 0.11.32
 - Node.js 20.20.2
 - pnpm 9.15.4
 

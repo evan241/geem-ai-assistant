@@ -21,14 +21,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.3,<9.0",
-  "pytest-asyncio>=0.25,<1.0",
+  "pytest>=9.0.3,<10.0",
+  "pytest-asyncio>=1.4,<2.0",
   "pytest-cov>=6.0,<7.0",
   "ruff>=0.9,<1.0",
   "mypy>=1.14,<2.0",
   "types-redis>=4.6,<5.0",
   "pre-commit>=4,<5",
   "boto3-stubs[s3]>=1.40,<2.0",
+  "pip-audit>=2.9,<3.0",
+  "openapi-spec-validator>=0.7,<1.0",
 ]
 
 [build-system]
@@ -60,10 +62,30 @@ plugins = ["pydantic.mypy"]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 addopts = "-ra --strict-markers --strict-config"
+markers = [
+  "unit: pruebas unitarias rápidas",
+  "domain: pruebas de reglas de dominio",
+  "application: pruebas de casos de uso",
+  "repository: pruebas de persistencia",
+  "integration: pruebas de integración",
+  "api: pruebas de endpoint",
+  "contract: pruebas de contrato",
+  "worker: pruebas de workers y colas",
+  "security: pruebas de seguridad",
+  "ai_eval: evaluaciones de componentes de IA",
+  "rag: evaluaciones del pipeline RAG",
+  "prompt: pruebas de prompts",
+  "tool_calling: pruebas de selección y ejecución de tools",
+  "e2e: pruebas end-to-end",
+  "performance: pruebas de rendimiento",
+  "chaos: pruebas de resiliencia",
+  "slow: pruebas lentas",
+  "provider: pruebas que llaman proveedores externos",
+]
 
 [tool.coverage.run]
 source = ["src", "apps"]
 branch = true
 
 [tool.uv]
-required-version = "==0.11.16"
+required-version = "==0.11.32"
