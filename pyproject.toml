@@ -61,3 +61,6 @@ addopts = "-ra --strict-markers --strict-config"
 [tool.coverage.run]
 source = ["src", "apps"]
 branch = true
+
+[tool.uv]
+required-version = "==0.11.16"
