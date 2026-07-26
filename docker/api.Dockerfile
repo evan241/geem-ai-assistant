@@ -24,7 +24,7 @@ COPY src ./src
 COPY apps ./apps
 COPY tests ./tests
 
-RUN python -m pip install --no-cache-dir "uv==0.11.16" \
+RUN python -m pip install --no-cache-dir "uv==0.11.32" \
     && uv sync --locked --all-extras \
     && chown -R app:app /app /opt/venv
 

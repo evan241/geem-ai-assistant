@@ -42,7 +42,7 @@ jobs:
       GEEM_OTEL_ENDPOINT: http://localhost:4317
       GEEM_DEV_AUTH_ENABLED: "false"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Start MinIO
         run: |
           docker run -d --rm \
@@ -64,16 +64,41 @@ jobs:
 
           docker logs geem-ai-minio
           exit 1
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12.13"
-      - run: python -m pip install "uv==0.11.16"
+      - run: python -m pip install "uv==0.11.32"
       - run: uv sync --locked --all-extras
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy src apps
       - run: uv run alembic upgrade head
-      - run: uv run pytest --cov=src --cov=apps
+      - name: Run backend tests
+        run: |
+          mkdir -p artifacts
+          uv run pytest \
+            --junitxml=artifacts/junit.xml \
+            --cov=src \
+            --cov=apps \
+            --cov-branch \
+            --cov-fail-under=85 \
+            --cov-report=term-missing \
+            --cov-report=xml:artifacts/coverage.xml
+      - name: Export OpenAPI
+        run: uv run python -m scripts.export_openapi
+      - name: Validate OpenAPI artifact
+        run: uv run openapi-spec-validator artifacts/openapi.json
+      - name: Audit Python dependencies
+        run: uv run pip-audit
+      - name: Upload backend evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-evidence
+          path: |
+            artifacts/junit.xml
+            artifacts/coverage.xml
+            artifacts/openapi.json
 
   frontend:
     runs-on: ubuntu-latest
@@ -81,11 +106,11 @@ jobs:
       run:
         working-directory: apps/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 9.15.4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20.20.2"
           cache: "pnpm"
@@ -94,10 +119,48 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
+      - name: Audit Node dependencies
+        run: pnpm audit --audit-level=high
 
   containers:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: cp .env.example .env
-      - run: docker compose build
+      - name: Build development containers
+        run: docker compose build
+      - name: Build production web image
+        run: |
+          docker build \
+            --target production \
+            -f docker/web.Dockerfile \
+            -t geem-ai-assistant-web:${{ github.sha }} \
+            .
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: geem-ai-assistant_api:latest
+          scan-type: image
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Scan production web image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: geem-ai-assistant-web:${{ github.sha }}
+          scan-type: image
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
