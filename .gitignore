@@ -23,4 +23,4 @@ dist/
 
 *.log
 data/
-storage/
+/storage/
