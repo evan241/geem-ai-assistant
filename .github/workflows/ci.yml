@@ -32,8 +32,15 @@ jobs:
           --health-timeout=3s
           --health-retries=10
     env:
-      DATABASE_URL: postgresql+psycopg://geem_ai:geem_ai_dev@localhost:5432/geem_ai
-      REDIS_URL: redis://localhost:6379/0
+      GEEM_APP_ENV: ci
+      GEEM_DATABASE_URL: postgresql+psycopg://geem_ai:geem_ai_dev@localhost:5432/geem_ai
+      GEEM_REDIS_URL: redis://localhost:6379/0
+      GEEM_STORAGE_ENDPOINT: http://localhost:9000
+      GEEM_STORAGE_BUCKET: geem-ai-documents
+      GEEM_STORAGE_ACCESS_KEY: geem_ai
+      GEEM_STORAGE_SECRET_KEY: geem_ai_dev_secret
+      GEEM_OTEL_ENDPOINT: http://localhost:4317
+      GEEM_DEV_AUTH_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
