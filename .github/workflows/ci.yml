@@ -127,8 +127,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: cp .env.example .env
-      - name: Build development containers
+      - name: Validate development container builds
         run: docker compose build
+      - name: Build API image for security scan
+        run: |
+          docker build \
+            -f docker/api.Dockerfile \
+            -t geem-ai-assistant-api:${{ github.sha }} \
+            .
       - name: Build production web image
         run: |
           docker build \
@@ -139,8 +145,8 @@ jobs:
       - name: Scan API image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: geem-ai-assistant_api:latest
-          scan-type: image
+          image-ref: geem-ai-assistant-api:${{ github.sha }}
+          scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
@@ -148,7 +154,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: geem-ai-assistant-web:${{ github.sha }}
-          scan-type: image
+          scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
