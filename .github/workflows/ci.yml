@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        image: pgvector/pgvector:0.8.5-pg16-bookworm@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
         env:
           POSTGRES_DB: geem_ai
           POSTGRES_USER: geem_ai
@@ -23,7 +23,7 @@ jobs:
           --health-timeout=5s
           --health-retries=10
       redis:
-        image: redis:7-alpine
+        image: redis:7.2.15-alpine3.21@sha256:05a97a479bc73de66f087dc05b569010772880f778cc8671fa6b8aadee32e5c6
         ports:
           - 6379:6379
         options: >-
