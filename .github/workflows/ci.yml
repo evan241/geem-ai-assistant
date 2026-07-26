@@ -51,6 +51,7 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy src apps
+      - run: uv run alembic upgrade head
       - run: uv run pytest --cov=src --cov=apps
 
   frontend:

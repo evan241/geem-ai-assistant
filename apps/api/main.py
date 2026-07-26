@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from apps.api.routes.health import router as health_router
 from geem_ai.shared.infrastructure.configuration.settings import get_settings
 
 
@@ -11,9 +12,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    @app.get("/health", tags=["system"])
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    app.include_router(health_router)
 
     return app
 
