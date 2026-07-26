@@ -1,0 +1,36 @@
+exclude: ^apps/web/tsconfig\.tsbuildinfo$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format --check .
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check .
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+
+      - id: mypy
+        name: mypy
+        entry: mypy src apps
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
