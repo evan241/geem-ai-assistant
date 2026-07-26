@@ -8,6 +8,22 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: geem_ai
+          POSTGRES_USER: geem_ai
+          POSTGRES_PASSWORD: geem_ai_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U geem_ai -d geem_ai"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql+psycopg://geem_ai:geem_ai_dev@localhost:5432/geem_ai
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
