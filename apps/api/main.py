@@ -1,11 +1,21 @@
 from fastapi import FastAPI
 
-app = FastAPI(
-    title="GEEM AI Assistant API",
-    version="0.1.0",
-)
+from geem_ai.shared.infrastructure.configuration.settings import get_settings
 
 
-@app.get("/health", tags=["system"])
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+def create_app() -> FastAPI:
+    settings = get_settings()
+
+    app = FastAPI(
+        title=settings.app_name,
+        version="0.1.0",
+    )
+
+    @app.get("/health", tags=["system"])
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()

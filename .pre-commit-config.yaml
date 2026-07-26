@@ -16,21 +16,21 @@ repos:
     hooks:
       - id: ruff-format
         name: ruff format
-        entry: ruff format --check .
+        entry: uv run ruff format --check .
         language: system
         pass_filenames: false
         types_or: [python, pyi]
 
       - id: ruff-check
         name: ruff check
-        entry: ruff check .
+        entry: uv run ruff check .
         language: system
         pass_filenames: false
         types_or: [python, pyi]
 
       - id: mypy
         name: mypy
-        entry: mypy src apps
+        entry: uv run mypy src apps
         language: system
         pass_filenames: false
         types_or: [python, pyi]
