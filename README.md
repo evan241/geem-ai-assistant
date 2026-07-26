@@ -25,8 +25,16 @@ Esta base incluye:
 - Docker Desktop
 - Git
 - Make (opcional)
-- Python 3.12+ para ejecución local sin Docker
-- Node.js 20+ y pnpm para ejecución local sin Docker
+
+Para desarrollo local sin Docker:
+
+- Python 3.12.13
+- uv 0.11.16
+- Node.js 20.20.2
+- pnpm 9.15.4
+
+Las versiones baseline están fijadas mediante `.python-version`, `.nvmrc`,
+`uv.lock` y `pnpm-lock.yaml`.
 
 ## Inicio rápido
 

@@ -3,6 +3,10 @@ FROM python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983
 ARG APP_UID=10001
 ARG APP_GID=10001
 
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON_DOWNLOADS=never \
+    PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
 
 RUN groupadd --gid "${APP_GID}" app \
@@ -13,16 +17,16 @@ RUN groupadd --gid "${APP_GID}" app \
         --shell /usr/sbin/nologin \
         app
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock .python-version README.md ./
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY src ./src
 COPY apps ./apps
 COPY tests ./tests
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -e ".[dev]" \
-    && chown -R app:app /app
+RUN python -m pip install --no-cache-dir "uv==0.11.16" \
+    && uv sync --locked --all-extras \
+    && chown -R app:app /app /opt/venv
 
 USER app
 
