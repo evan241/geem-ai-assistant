@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from functools import lru_cache
+from uuid import UUID
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -58,10 +59,32 @@ class Settings(BaseSettings):
         alias="GEEM_DEV_AUTH_ENABLED",
     )
 
+    dev_actor_tenant_id: UUID | None = Field(
+        default=None,
+        alias="GEEM_DEV_ACTOR_TENANT_ID",
+    )
+    dev_actor_user_id: UUID | None = Field(
+        default=None,
+        alias="GEEM_DEV_ACTOR_USER_ID",
+    )
+
     @model_validator(mode="after")
     def validate_environment_guards(self) -> Settings:
         if self.dev_auth_enabled and self.app_env is AppEnvironment.PRODUCTION:
             raise ValueError("Development authentication cannot run in production.")
+
+        if self.dev_auth_enabled and self.app_env not in {
+            AppEnvironment.LOCAL,
+            AppEnvironment.TEST,
+        }:
+            raise ValueError(
+                "Development authentication can only run in local or test environments."
+            )
+
+        if self.dev_auth_enabled and (
+            self.dev_actor_tenant_id is None or self.dev_actor_user_id is None
+        ):
+            raise ValueError("Development authentication requires tenant and user IDs.")
 
         return self
 
