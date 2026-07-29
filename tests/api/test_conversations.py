@@ -10,6 +10,7 @@ def test_create_conversation_returns_201(monkeypatch) -> None:
     tenant_id = uuid4()
     user_id = uuid4()
 
+    monkeypatch.setenv("GEEM_APP_ENV", "test")
     monkeypatch.setenv("GEEM_DEV_AUTH_ENABLED", "true")
     monkeypatch.setenv("GEEM_DEV_ACTOR_TENANT_ID", str(tenant_id))
     monkeypatch.setenv("GEEM_DEV_ACTOR_USER_ID", str(user_id))
