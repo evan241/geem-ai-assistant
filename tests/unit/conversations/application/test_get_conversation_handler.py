@@ -3,13 +3,13 @@ from uuid import uuid4
 
 import pytest
 
+from geem_ai.conversations.application.exceptions import ConversationNotFoundError
 from geem_ai.conversations.application.handlers import GetConversationHandler
 from geem_ai.conversations.application.ports.repositories import (
     ConversationReadRepository,
 )
 from geem_ai.conversations.application.queries import GetConversationQuery
 from geem_ai.conversations.application.views import ConversationView
-from geem_ai.conversations.domain.exceptions import ConversationNotFoundError
 from geem_ai.shared.domain.actor import Actor
 from geem_ai.shared.domain.ids import ConversationId, TenantId, UserId
 
