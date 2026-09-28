@@ -4,11 +4,17 @@ from collections.abc import Callable
 from datetime import datetime
 
 from geem_ai.conversations.application.commands import CreateConversationCommand
+from geem_ai.conversations.application.ports.repositories import (
+    ConversationReadRepository,
+)
 from geem_ai.conversations.application.ports.unit_of_work import (
     ConversationUnitOfWorkFactory,
 )
+from geem_ai.conversations.application.queries import GetConversationQuery
 from geem_ai.conversations.application.results import CreateConversationResult
+from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.conversation import Conversation
+from geem_ai.conversations.domain.exceptions import ConversationNotFoundError
 from geem_ai.shared.domain.ids import ConversationId
 
 
@@ -55,3 +61,26 @@ class CreateConversationHandler:
             updated_at=conversation.updated_at,
             version=conversation.version,
         )
+
+
+class GetConversationHandler:
+    def __init__(
+        self,
+        *,
+        repository: ConversationReadRepository,
+    ) -> None:
+        self._repository = repository
+
+    def handle(
+        self,
+        query: GetConversationQuery,
+    ) -> ConversationView:
+        conversation = self._repository.get_view(
+            query.actor.tenant_id,
+            query.conversation_id,
+        )
+
+        if conversation is None:
+            raise ConversationNotFoundError()
+
+        return conversation

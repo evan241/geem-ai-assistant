@@ -1,5 +1,6 @@
 from typing import Protocol
 
+from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.shared.domain.ids import ConversationId, TenantId
 
@@ -18,3 +19,11 @@ class ConversationRepository(Protocol):
         tenant_id: TenantId,
         conversation_id: ConversationId,
     ) -> bool: ...
+
+
+class ConversationReadRepository(Protocol):
+    def get_view(
+        self,
+        tenant_id: TenantId,
+        conversation_id: ConversationId,
+    ) -> ConversationView | None: ...
