@@ -2,10 +2,6 @@ class ConversationDomainError(Exception):
     """Base exception for conversation domain errors."""
 
 
-class ConversationNotFoundError(ConversationDomainError):
-    """Raised when a conversation is not found or is not visible."""
-
-
 class ConversationNotActiveError(ConversationDomainError):
     """Raised when a conversation cannot accept new messages."""
 

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from geem_ai.conversations.application.commands import CreateConversationCommand
+from geem_ai.conversations.application.exceptions import ConversationNotFoundError
 from geem_ai.conversations.application.ports.repositories import (
     ConversationReadRepository,
 )
@@ -14,7 +15,6 @@ from geem_ai.conversations.application.queries import GetConversationQuery
 from geem_ai.conversations.application.results import CreateConversationResult
 from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.conversation import Conversation
-from geem_ai.conversations.domain.exceptions import ConversationNotFoundError
 from geem_ai.shared.domain.ids import ConversationId
 
 
