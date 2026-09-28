@@ -9,6 +9,11 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install --only-upgrade --no-install-recommends -y \
+        libpcre2-8-0=10.42-1+deb12u1 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid "${APP_GID}" app \
     && useradd \
         --uid "${APP_UID}" \
