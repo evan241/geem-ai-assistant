@@ -403,12 +403,12 @@ wheels = [
 
 [[package]]
 name = "cryptography"
-version = "50.0.0"
+version = "50.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cffi", marker = "platform_python_implementation != 'PyPy'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/source/c/cryptography/cryptography-50.0.0.tar.gz" }
+sdist = { url = "https://files.pythonhosted.org/packages/source/c/cryptography/cryptography-50.0.1.tar.gz" }
 
 [[package]]
 name = "cyclonedx-python-lib"
