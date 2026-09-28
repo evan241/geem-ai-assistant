@@ -137,7 +137,10 @@ jobs:
         run: docker compose build
       - name: Build API image for security scan
         run: |
-          docker build \
+          docker buildx build \
+            --load \
+            --provenance=false \
+            --sbom=false \
             -f docker/api.Dockerfile \
             -t geem-ai-assistant-api:${{ github.sha }} \
             .
