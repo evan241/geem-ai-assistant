@@ -115,6 +115,9 @@ def test_execution_repository_persists_created_execution() -> None:
     try:
         with Session(engine) as session:
             SQLAlchemyConversationRepository(session).add(conversation)
+            session.commit()
+
+        with Session(engine) as session:
             SQLAlchemyAssistantExecutionRepository(session).add(execution)
             session.commit()
 
