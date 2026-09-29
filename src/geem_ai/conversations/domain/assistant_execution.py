@@ -30,6 +30,8 @@ class AssistantExecution:
     assistant_message_id: MessageId | None
     status: ExecutionStatus
     capability: ExecutionCapability
+    created_at: datetime
+    updated_at: datetime
 
     provider: str | None = None
     model: str | None = None
@@ -56,6 +58,7 @@ class AssistantExecution:
         conversation_id: ConversationId,
         user_message_id: MessageId,
         capability: ExecutionCapability,
+        now: datetime,
     ) -> AssistantExecution:
         return cls(
             id=execution_id,
@@ -65,6 +68,8 @@ class AssistantExecution:
             assistant_message_id=None,
             status=ExecutionStatus.CREATED,
             capability=capability,
+            created_at=now,
+            updated_at=now,
         )
 
     def start(self, *, now: datetime) -> None:
@@ -72,6 +77,7 @@ class AssistantExecution:
 
         self.status = ExecutionStatus.RUNNING
         self.started_at = now
+        self.updated_at = now
 
     def complete(
         self,
@@ -111,6 +117,7 @@ class AssistantExecution:
         self.latency_ms = latency_ms
         self.completed_at = now
         self.status = ExecutionStatus.COMPLETED
+        self.updated_at = now
 
     def fail(
         self,
@@ -128,6 +135,7 @@ class AssistantExecution:
         self.failure_detail = failure_detail
         self.completed_at = now
         self.status = ExecutionStatus.FAILED
+        self.updated_at = now
 
     def _require_status(self, expected: ExecutionStatus) -> None:
         if self.status is not expected:
@@ -167,3 +175,4 @@ class AssistantExecution:
 
         self.status = ExecutionStatus.CANCELLED
         self.completed_at = now
+        self.updated_at = now

@@ -3,13 +3,17 @@ from __future__ import annotations
 from typing import Protocol, Self
 
 from geem_ai.conversations.application.ports.repositories import (
+    AssistantExecutionRepository,
     ConversationRepository,
+    MessageRepository,
 )
 from geem_ai.shared.domain.actor import Actor
 
 
 class ConversationUnitOfWork(Protocol):
     conversations: ConversationRepository
+    messages: MessageRepository
+    executions: AssistantExecutionRepository
 
     def __enter__(self) -> Self: ...
 

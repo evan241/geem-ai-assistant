@@ -606,6 +606,8 @@ AssistantExecution
 ├── cost
 ├── started_at
 ├── completed_at
+├── created_at
+├── updated_at
 ├── failure
 └── version
 ```
@@ -636,6 +638,8 @@ direct_response knowledge_query tool_request memory_operation workflow
 ## 7. Costos y uso no pueden ser negativos.
 
 ## 8. El prompt y modelo usados deben quedar versionados.
+
+## 9. created_at es inmutable y updated_at refleja la última transición de estado.
 
 ## 53. State machine de AssistantExecution
 
