@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
 from typing import Self
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from geem_ai.conversations.application.commands import SendConversationMessageCommand
+from geem_ai.conversations.application.events import OutboxEvent
 from geem_ai.conversations.application.exceptions import ConversationNotFoundError
 from geem_ai.conversations.application.handlers import SendConversationMessageHandler
 from geem_ai.conversations.application.idempotency import IdempotencyRecord
@@ -13,6 +14,7 @@ from geem_ai.conversations.application.ports.repositories import (
     ConversationRepository,
     IdempotencyRepository,
     MessageRepository,
+    OutboxRepository,
 )
 from geem_ai.conversations.application.ports.unit_of_work import ConversationUnitOfWork
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
@@ -78,6 +80,14 @@ class FakeAssistantExecutionRepository:
         self.added.append(execution)
 
 
+class FakeOutboxRepository:
+    def __init__(self) -> None:
+        self.added: list[OutboxEvent] = []
+
+    def add(self, event: OutboxEvent) -> None:
+        self.added.append(event)
+
+
 class FakeIdempotencyRepository:
     def __init__(self) -> None:
         self.records: list[IdempotencyRecord] = []
@@ -122,6 +132,8 @@ class FakeConversationUnitOfWork:
         self.executions: AssistantExecutionRepository = self.execution_repository
         self.idempotency_repository = FakeIdempotencyRepository()
         self.idempotency: IdempotencyRepository = self.idempotency_repository
+        self.outbox_repository = FakeOutboxRepository()
+        self.outbox: OutboxRepository = self.outbox_repository
         self.commit_count = 0
         self.rollback_count = 0
 
@@ -173,6 +185,7 @@ def build_handler(
     *,
     message_id: MessageId | None = None,
     execution_id: ExecutionId | None = None,
+    outbox_event_id: UUID | None = None,
 ) -> tuple[
     SendConversationMessageHandler,
     MessageId,
@@ -181,6 +194,7 @@ def build_handler(
 ]:
     expected_message_id = message_id or MessageId(uuid4())
     expected_execution_id = execution_id or ExecutionId(uuid4())
+    expected_outbox_event_id = outbox_event_id or uuid4()
     factory = FakeConversationUnitOfWorkFactory(unit_of_work)
     handler = SendConversationMessageHandler(
         unit_of_work_factory=factory,
@@ -188,6 +202,7 @@ def build_handler(
         execution_id_factory=lambda: expected_execution_id,
         clock=lambda: NOW,
         idempotency_id_factory=uuid4,
+        outbox_event_id_factory=lambda: expected_outbox_event_id,
     )
     return handler, expected_message_id, expected_execution_id, factory
 
@@ -235,6 +250,25 @@ def test_accepts_message_and_creates_pending_execution_atomically() -> None:
     assert execution.updated_at == NOW
 
     assert unit_of_work.idempotency_repository.reserve_results == [True]
+    assert len(unit_of_work.outbox_repository.added) == 1
+    event = unit_of_work.outbox_repository.added[0]
+    assert event.event_type == "assistant.execution.requested"
+    assert event.event_version == 1
+    assert event.aggregate_type == "assistant_execution"
+    assert event.aggregate_id == execution_id.value
+    assert event.tenant_id == actor.tenant_id.value
+    assert event.payload == {
+        "assistant_execution_id": str(execution_id.value),
+        "conversation_id": str(conversation.id.value),
+        "user_message_id": str(message_id.value),
+        "capability": "direct_response",
+    }
+    assert event.status == "pending"
+    assert event.attempt == 0
+    assert event.available_at == NOW
+    assert event.created_at == NOW
+    assert event.correlation_id is None
+    assert event.causation_id is None
     assert unit_of_work.commit_count == 1
     assert result.user_message_id == message_id
     assert result.assistant_execution_id == execution_id
@@ -353,8 +387,14 @@ def test_accepts_explicit_direct_response_and_uses_supplied_factories() -> None:
     conversation = build_conversation(actor)
     message_id = MessageId(uuid4())
     execution_id = ExecutionId(uuid4())
+    outbox_event_id = uuid4()
     unit_of_work = FakeConversationUnitOfWork([conversation])
-    handler, _, _, _ = build_handler(unit_of_work, message_id=message_id, execution_id=execution_id)
+    handler, _, _, _ = build_handler(
+        unit_of_work,
+        message_id=message_id,
+        execution_id=execution_id,
+        outbox_event_id=outbox_event_id,
+    )
 
     result = handler.handle(
         SendConversationMessageCommand(
@@ -368,12 +408,14 @@ def test_accepts_explicit_direct_response_and_uses_supplied_factories() -> None:
 
     assert result.user_message_id is message_id
     assert result.assistant_execution_id is execution_id
+    assert unit_of_work.outbox_repository.added[0].id == outbox_event_id
 
 
 def assert_no_writes_or_commit(unit_of_work: FakeConversationUnitOfWork) -> None:
     assert unit_of_work.conversation_repository.saved == []
     assert unit_of_work.message_repository.added == []
     assert unit_of_work.execution_repository.added == []
+    assert unit_of_work.outbox_repository.added == []
     assert unit_of_work.commit_count == 0
 
 
@@ -396,6 +438,7 @@ def test_replay_returns_stored_result_without_new_business_effects() -> None:
     assert len(unit_of_work.message_repository.added) == 1
     assert len(unit_of_work.execution_repository.added) == 1
     assert len(unit_of_work.conversation_repository.saved) == 1
+    assert len(unit_of_work.outbox_repository.added) == 1
     assert unit_of_work.idempotency_repository.reserve_results == [True, False]
     assert unit_of_work.commit_count == 1
     record = unit_of_work.idempotency_repository.records[0]
@@ -449,6 +492,7 @@ def test_reused_key_with_different_logical_payload_conflicts(
     assert len(unit_of_work.message_repository.added) == 1
     assert len(unit_of_work.execution_repository.added) == 1
     assert len(unit_of_work.conversation_repository.saved) == 1
+    assert len(unit_of_work.outbox_repository.added) == 1
     assert unit_of_work.commit_count == 1
 
 
@@ -471,6 +515,7 @@ def test_processing_identical_request_raises_in_progress() -> None:
     assert len(unit_of_work.message_repository.added) == 1
     assert len(unit_of_work.execution_repository.added) == 1
     assert len(unit_of_work.conversation_repository.saved) == 1
+    assert len(unit_of_work.outbox_repository.added) == 1
     assert unit_of_work.commit_count == 1
 
 

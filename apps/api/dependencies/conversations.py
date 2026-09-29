@@ -61,6 +61,7 @@ def get_send_conversation_message_handler() -> Iterator[SendConversationMessageH
             message_id_factory=lambda: MessageId(uuid4()),
             execution_id_factory=lambda: ExecutionId(uuid4()),
             idempotency_id_factory=uuid4,
+            outbox_event_id_factory=uuid4,
             clock=lambda: datetime.now(UTC),
         )
     finally:

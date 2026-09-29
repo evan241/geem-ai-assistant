@@ -10,12 +10,14 @@ from geem_ai.conversations.application.ports.repositories import (
     ConversationRepository,
     IdempotencyRepository,
     MessageRepository,
+    OutboxRepository,
 )
 from geem_ai.conversations.infrastructure.persistence.repositories import (
     SQLAlchemyAssistantExecutionRepository,
     SQLAlchemyConversationRepository,
     SQLAlchemyIdempotencyRepository,
     SQLAlchemyMessageRepository,
+    SQLAlchemyOutboxRepository,
 )
 from geem_ai.shared.domain.actor import Actor
 
@@ -38,6 +40,7 @@ class SQLAlchemyConversationUnitOfWork:
             self.session
         )
         self.idempotency: IdempotencyRepository = SQLAlchemyIdempotencyRepository(self.session)
+        self.outbox: OutboxRepository = SQLAlchemyOutboxRepository(self.session)
 
     def __enter__(self) -> Self:
         self._set_actor_context()

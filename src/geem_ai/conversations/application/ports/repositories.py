@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from geem_ai.conversations.application.events import OutboxEvent
 from geem_ai.conversations.application.idempotency import IdempotencyRecord
 from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
@@ -34,6 +35,10 @@ class MessageRepository(Protocol):
 
 class AssistantExecutionRepository(Protocol):
     def add(self, execution: AssistantExecution) -> None: ...
+
+
+class OutboxRepository(Protocol):
+    def add(self, event: OutboxEvent) -> None: ...
 
 
 class IdempotencyRepository(Protocol):

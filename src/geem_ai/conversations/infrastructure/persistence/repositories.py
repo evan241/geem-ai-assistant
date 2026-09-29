@@ -8,6 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from geem_ai.conversations.application.events import OutboxEvent
 from geem_ai.conversations.application.idempotency import (
     IdempotencyRecord,
     IdempotencyStatus,
@@ -24,6 +25,7 @@ from geem_ai.conversations.infrastructure.persistence.models import (
     ConversationModel,
     IdempotencyRecordModel,
     MessageModel,
+    OutboxEventModel,
 )
 from geem_ai.shared.domain.ids import ConversationId, TenantId, UserId
 
@@ -225,6 +227,32 @@ class SQLAlchemyMessageRepository:
             completed_at=message.completed_at,
         )
         self._session.add(model)
+
+
+class SQLAlchemyOutboxRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(self, event: OutboxEvent) -> None:
+        self._session.add(
+            OutboxEventModel(
+                id=event.id,
+                tenant_id=event.tenant_id,
+                event_type=event.event_type,
+                event_version=event.event_version,
+                aggregate_type=event.aggregate_type,
+                aggregate_id=event.aggregate_id,
+                correlation_id=event.correlation_id,
+                causation_id=event.causation_id,
+                payload=event.payload,
+                status=event.status,
+                attempt=event.attempt,
+                available_at=event.available_at,
+                created_at=event.created_at,
+                published_at=event.published_at,
+                last_error=event.last_error,
+            )
+        )
 
 
 class SQLAlchemyAssistantExecutionRepository:
