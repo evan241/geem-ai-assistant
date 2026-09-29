@@ -2,6 +2,10 @@ class ConversationNotFoundError(Exception):
     """Raised when a conversation is not found or is not visible."""
 
 
+class AssistantExecutionNotFoundError(Exception):
+    """Raised when an assistant execution is not found or is not visible."""
+
+
 class InvalidIdempotencyKeyError(ValueError):
     """Raised when an idempotency key is empty or exceeds its storage limit."""
 

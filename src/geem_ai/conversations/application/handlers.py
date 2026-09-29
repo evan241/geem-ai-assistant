@@ -5,11 +5,13 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from geem_ai.conversations.application.commands import (
+    ClaimAssistantExecutionCommand,
     CreateConversationCommand,
     SendConversationMessageCommand,
 )
 from geem_ai.conversations.application.events import assistant_execution_requested
 from geem_ai.conversations.application.exceptions import (
+    AssistantExecutionNotFoundError,
     ConversationNotFoundError,
     IdempotencyKeyConflictError,
     IdempotencyRequestInProgressError,
@@ -31,6 +33,7 @@ from geem_ai.conversations.application.ports.unit_of_work import (
 )
 from geem_ai.conversations.application.queries import GetConversationQuery
 from geem_ai.conversations.application.results import (
+    ClaimAssistantExecutionResult,
     CreateConversationResult,
     SendConversationMessageResult,
 )
@@ -39,6 +42,31 @@ from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.enums import ExecutionCapability
 from geem_ai.shared.domain.ids import ConversationId, ExecutionId, MessageId
+
+
+class ClaimAssistantExecutionHandler:
+    def __init__(
+        self,
+        *,
+        unit_of_work_factory: ConversationUnitOfWorkFactory,
+        clock: Callable[[], datetime],
+    ) -> None:
+        self._unit_of_work_factory = unit_of_work_factory
+        self._clock = clock
+
+    def handle(self, command: ClaimAssistantExecutionCommand) -> ClaimAssistantExecutionResult:
+        with self._unit_of_work_factory.create(command.actor) as unit_of_work:
+            execution = unit_of_work.executions.get_for_update(
+                command.actor.tenant_id, command.execution_id
+            )
+            if execution is None:
+                raise AssistantExecutionNotFoundError()
+
+            execution.start(now=self._clock())
+            unit_of_work.executions.save(execution)
+            unit_of_work.commit()
+
+        return ClaimAssistantExecutionResult(execution=execution)
 
 
 class CreateConversationHandler:
