@@ -13,7 +13,7 @@ from geem_ai.conversations.infrastructure.persistence.repositories import (
 )
 from geem_ai.shared.domain.ids import TenantId
 from geem_ai.shared.infrastructure.configuration.settings import get_settings
-from geem_ai.shared.infrastructure.persistence.database import create_database_engine
+from geem_ai.shared.infrastructure.persistence.connection import create_database_engine
 
 NOW = datetime(2026, 9, 29, 12, tzinfo=UTC)
 TENANT = TenantId(UUID("10000000-0000-0000-0000-000000000001"))
