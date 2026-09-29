@@ -77,6 +77,7 @@ class AssistantExecution:
 
         self.status = ExecutionStatus.RUNNING
         self.started_at = now
+        self.updated_at = now
 
     def complete(
         self,
@@ -116,6 +117,7 @@ class AssistantExecution:
         self.latency_ms = latency_ms
         self.completed_at = now
         self.status = ExecutionStatus.COMPLETED
+        self.updated_at = now
 
     def fail(
         self,
@@ -133,6 +135,7 @@ class AssistantExecution:
         self.failure_detail = failure_detail
         self.completed_at = now
         self.status = ExecutionStatus.FAILED
+        self.updated_at = now
 
     def _require_status(self, expected: ExecutionStatus) -> None:
         if self.status is not expected:
@@ -172,3 +175,4 @@ class AssistantExecution:
 
         self.status = ExecutionStatus.CANCELLED
         self.completed_at = now
+        self.updated_at = now
