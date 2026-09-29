@@ -1,9 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-import pytest
 from sqlalchemy import Engine, delete
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from geem_ai.conversations.application.idempotency import IdempotencyRecord
@@ -57,7 +55,7 @@ def test_idempotency_mapping_and_completion_persist_safe_response() -> None:
     try:
         with Session(engine) as session:
             repository = SQLAlchemyIdempotencyRepository(session)
-            repository.add(item)
+            assert repository.reserve(item) is True
             repository.complete(
                 item,
                 response_status=200,
@@ -81,22 +79,46 @@ def test_idempotency_mapping_and_completion_persist_safe_response() -> None:
         engine.dispose()
 
 
-def test_unique_key_is_tenant_scoped() -> None:
+def test_atomic_reservation_is_tenant_scoped_and_does_not_raise_on_conflict() -> None:
     engine = create_database_engine(get_settings().database_url)
     cleanup(engine)
     try:
         with Session(engine) as session:
             repository = SQLAlchemyIdempotencyRepository(session)
-            repository.add(record(record_id=1))
-            repository.add(record(record_id=2, tenant=OTHER_TENANT))
+            assert repository.reserve(record(record_id=1)) is True
+            assert repository.reserve(record(record_id=2)) is False
+            assert repository.reserve(record(record_id=3, tenant=OTHER_TENANT)) is True
+            session.commit()
+    finally:
+        cleanup(engine)
+        engine.dispose()
+
+
+def test_completion_update_is_tenant_scoped() -> None:
+    engine = create_database_engine(get_settings().database_url)
+    cleanup(engine)
+    stored = record(record_id=1)
+    mismatched = record(record_id=1, tenant=OTHER_TENANT)
+    try:
+        with Session(engine) as session:
+            repository = SQLAlchemyIdempotencyRepository(session)
+            assert repository.reserve(stored) is True
+            repository.complete(
+                mismatched,
+                response_status=200,
+                response_body={"execution_status": "created"},
+                resource_type="assistant_execution",
+                resource_id=UUID(int=12),
+                completed_at=NOW,
+            )
             session.commit()
 
-        with pytest.raises(IntegrityError), Session(engine) as session:
-            repository = SQLAlchemyIdempotencyRepository(session)
-            duplicate = record(record_id=3)
-            duplicate.request_hash = "b" * 64
-            repository.add(duplicate)
-            session.commit()
+        with Session(engine) as session:
+            persisted = session.get(IdempotencyRecordModel, stored.id)
+            assert persisted is not None
+            assert persisted.status == "processing"
+            assert persisted.response_body is None
+            assert persisted.completed_at is None
     finally:
         cleanup(engine)
         engine.dispose()
@@ -107,7 +129,7 @@ def test_rollback_removes_processing_record() -> None:
     cleanup(engine)
     try:
         with Session(engine) as session:
-            SQLAlchemyIdempotencyRepository(session).add(record(record_id=1))
+            assert SQLAlchemyIdempotencyRepository(session).reserve(record(record_id=1)) is True
             session.rollback()
 
         with Session(engine) as session:

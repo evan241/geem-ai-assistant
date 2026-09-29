@@ -81,6 +81,7 @@ class FakeAssistantExecutionRepository:
 class FakeIdempotencyRepository:
     def __init__(self) -> None:
         self.records: list[IdempotencyRecord] = []
+        self.reserve_results: list[bool] = []
 
     def get(self, tenant_id: TenantId, scope: str, key: str) -> IdempotencyRecord | None:
         return next(
@@ -94,8 +95,15 @@ class FakeIdempotencyRepository:
             None,
         )
 
-    def add(self, record: IdempotencyRecord) -> None:
+    def reserve(self, record: IdempotencyRecord) -> bool:
+        reserved = (
+            self.get(TenantId(record.tenant_id), record.scope, record.idempotency_key) is None
+        )
+        self.reserve_results.append(reserved)
+        if not reserved:
+            return False
         self.records.append(record)
+        return True
 
     def complete(self, record: IdempotencyRecord, **values: object) -> None:
         record.status = "completed"
@@ -179,6 +187,7 @@ def build_handler(
         message_id_factory=lambda: expected_message_id,
         execution_id_factory=lambda: expected_execution_id,
         clock=lambda: NOW,
+        idempotency_id_factory=uuid4,
     )
     return handler, expected_message_id, expected_execution_id, factory
 
@@ -225,6 +234,7 @@ def test_accepts_message_and_creates_pending_execution_atomically() -> None:
     assert execution.created_at == NOW
     assert execution.updated_at == NOW
 
+    assert unit_of_work.idempotency_repository.reserve_results == [True]
     assert unit_of_work.commit_count == 1
     assert result.user_message_id == message_id
     assert result.assistant_execution_id == execution_id
@@ -386,6 +396,7 @@ def test_replay_returns_stored_result_without_new_business_effects() -> None:
     assert len(unit_of_work.message_repository.added) == 1
     assert len(unit_of_work.execution_repository.added) == 1
     assert len(unit_of_work.conversation_repository.saved) == 1
+    assert unit_of_work.idempotency_repository.reserve_results == [True, False]
     assert unit_of_work.commit_count == 1
     record = unit_of_work.idempotency_repository.records[0]
     assert record.status == "completed"
@@ -434,6 +445,11 @@ def test_reused_key_with_different_logical_payload_conflicts(
                 capability_hint="knowledge_query" if changed_capability else None,
             )
         )
+    assert unit_of_work.idempotency_repository.reserve_results == [True, False]
+    assert len(unit_of_work.message_repository.added) == 1
+    assert len(unit_of_work.execution_repository.added) == 1
+    assert len(unit_of_work.conversation_repository.saved) == 1
+    assert unit_of_work.commit_count == 1
 
 
 def test_processing_identical_request_raises_in_progress() -> None:
@@ -451,6 +467,10 @@ def test_processing_identical_request_raises_in_progress() -> None:
 
     with pytest.raises(IdempotencyRequestInProgressError):
         handler.handle(command)
+    assert unit_of_work.idempotency_repository.reserve_results == [True, False]
+    assert len(unit_of_work.message_repository.added) == 1
+    assert len(unit_of_work.execution_repository.added) == 1
+    assert len(unit_of_work.conversation_repository.saved) == 1
     assert unit_of_work.commit_count == 1
 
 

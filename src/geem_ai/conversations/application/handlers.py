@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from geem_ai.conversations.application.commands import (
     CreateConversationCommand,
@@ -93,7 +93,7 @@ class SendConversationMessageHandler:
         message_id_factory: Callable[[], MessageId],
         execution_id_factory: Callable[[], ExecutionId],
         clock: Callable[[], datetime],
-        idempotency_id_factory: Callable[[], UUID] = uuid4,
+        idempotency_id_factory: Callable[[], UUID],
     ) -> None:
         self._unit_of_work_factory = unit_of_work_factory
         self._message_id_factory = message_id_factory
@@ -118,20 +118,6 @@ class SendConversationMessageHandler:
         )
 
         with self._unit_of_work_factory.create(command.actor) as unit_of_work:
-            existing = unit_of_work.idempotency.get(
-                command.actor.tenant_id,
-                SEND_MESSAGE_IDEMPOTENCY_SCOPE,
-                command.idempotency_key,
-            )
-            if existing is not None:
-                if existing.request_hash != request_hash:
-                    raise IdempotencyKeyConflictError()
-                if existing.status == "processing":
-                    raise IdempotencyRequestInProgressError()
-                if existing.status == "completed" and existing.response_body is not None:
-                    return deserialize_send_message_result(existing.response_body)
-                raise IdempotencyRequestInProgressError()
-
             idempotency_record = IdempotencyRecord(
                 id=self._idempotency_id_factory(),
                 tenant_id=command.actor.tenant_id.value,
@@ -147,7 +133,21 @@ class SendConversationMessageHandler:
                 completed_at=None,
                 expires_at=now + timedelta(hours=IDEMPOTENCY_TTL_HOURS),
             )
-            unit_of_work.idempotency.add(idempotency_record)
+            if not unit_of_work.idempotency.reserve(idempotency_record):
+                existing = unit_of_work.idempotency.get(
+                    command.actor.tenant_id,
+                    SEND_MESSAGE_IDEMPOTENCY_SCOPE,
+                    command.idempotency_key,
+                )
+                if existing is None:
+                    raise RuntimeError("Reserved idempotency record could not be loaded.")
+                if existing.request_hash != request_hash:
+                    raise IdempotencyKeyConflictError()
+                if existing.status == "processing":
+                    raise IdempotencyRequestInProgressError()
+                if existing.status == "completed" and existing.response_body is not None:
+                    return deserialize_send_message_result(existing.response_body)
+                raise IdempotencyRequestInProgressError()
             conversation = unit_of_work.conversations.get_by_id(
                 command.actor.tenant_id,
                 command.conversation_id,

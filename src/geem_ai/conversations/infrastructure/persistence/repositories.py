@@ -5,6 +5,7 @@ from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from geem_ai.conversations.application.idempotency import (
@@ -125,8 +126,14 @@ class SQLAlchemyIdempotencyRepository:
         )
         return None if model is None else self._to_record(model)
 
-    def add(self, record: IdempotencyRecord) -> None:
-        self._session.add(IdempotencyRecordModel(**self._values(record)))
+    def reserve(self, record: IdempotencyRecord) -> bool:
+        statement = (
+            insert(IdempotencyRecordModel)
+            .values(**self._values(record))
+            .on_conflict_do_nothing(index_elements=["tenant_id", "scope", "idempotency_key"])
+        )
+        result = self._session.execute(statement)
+        return result.rowcount == 1
 
     def complete(
         self,
@@ -146,7 +153,10 @@ class SQLAlchemyIdempotencyRepository:
         record.completed_at = completed_at
         self._session.execute(
             update(IdempotencyRecordModel)
-            .where(IdempotencyRecordModel.id == record.id)
+            .where(
+                IdempotencyRecordModel.id == record.id,
+                IdempotencyRecordModel.tenant_id == record.tenant_id,
+            )
             .values(
                 status="completed",
                 response_status=response_status,
