@@ -33,6 +33,7 @@ RUN python -m pip install --no-cache-dir \
         "setuptools>=78.1.1" \
         "uv==0.11.32" \
     && uv sync --locked --all-extras \
+    && rm -f /usr/local/lib/python3.12/site-packages/pip/_vendor/bom.cdx.json \
     && chown -R app:app /app /opt/venv
 
 USER app
