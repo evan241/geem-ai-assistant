@@ -131,9 +131,10 @@ class SQLAlchemyIdempotencyRepository:
             insert(IdempotencyRecordModel)
             .values(**self._values(record))
             .on_conflict_do_nothing(index_elements=["tenant_id", "scope", "idempotency_key"])
+            .returning(IdempotencyRecordModel.id)
         )
-        result = self._session.execute(statement)
-        return result.rowcount == 1
+        inserted_id = self._session.scalar(statement)
+        return inserted_id is not None
 
     def complete(
         self,
