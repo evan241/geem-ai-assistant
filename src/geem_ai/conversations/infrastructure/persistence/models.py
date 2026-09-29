@@ -136,6 +136,42 @@ class IdempotencyRecordModel(Base):
     )
 
 
+class OutboxEventModel(Base):
+    __tablename__ = "outbox_events"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    tenant_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    event_type: Mapped[str] = mapped_column(String(200), nullable=False)
+    event_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    aggregate_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    aggregate_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    correlation_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    causation_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="pending", server_default="pending"
+    )
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'publishing', 'published', 'failed', 'dead_letter')",
+            name="ck_outbox_events__status",
+        ),
+        CheckConstraint("attempt >= 0", name="ck_outbox_events__attempt"),
+        Index(
+            "ix_outbox_events__pending_available",
+            "available_at",
+            "created_at",
+            postgresql_where=text("status IN ('pending', 'failed')"),
+        ),
+    )
+
+
 class MessageModel(Base):
     __tablename__ = "messages"
 

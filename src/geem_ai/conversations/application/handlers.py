@@ -8,6 +8,7 @@ from geem_ai.conversations.application.commands import (
     CreateConversationCommand,
     SendConversationMessageCommand,
 )
+from geem_ai.conversations.application.events import assistant_execution_requested
 from geem_ai.conversations.application.exceptions import (
     ConversationNotFoundError,
     IdempotencyKeyConflictError,
@@ -94,12 +95,14 @@ class SendConversationMessageHandler:
         execution_id_factory: Callable[[], ExecutionId],
         clock: Callable[[], datetime],
         idempotency_id_factory: Callable[[], UUID],
+        outbox_event_id_factory: Callable[[], UUID],
     ) -> None:
         self._unit_of_work_factory = unit_of_work_factory
         self._message_id_factory = message_id_factory
         self._execution_id_factory = execution_id_factory
         self._clock = clock
         self._idempotency_id_factory = idempotency_id_factory
+        self._outbox_event_id_factory = outbox_event_id_factory
 
     def handle(
         self,
@@ -173,6 +176,11 @@ class SendConversationMessageHandler:
             unit_of_work.conversations.save(conversation)
             unit_of_work.messages.add(user_message)
             unit_of_work.executions.add(execution)
+            unit_of_work.outbox.add(
+                assistant_execution_requested(
+                    event_id=self._outbox_event_id_factory(), execution=execution, now=now
+                )
+            )
             result = SendConversationMessageResult(
                 user_message_id=user_message.id,
                 assistant_execution_id=execution.id,

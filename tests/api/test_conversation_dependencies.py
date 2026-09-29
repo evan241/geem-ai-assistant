@@ -23,6 +23,7 @@ def test_send_message_dependency_wires_handler_and_disposes_engine(monkeypatch) 
     assert handler._message_id_factory() != handler._message_id_factory()
     assert handler._execution_id_factory() != handler._execution_id_factory()
     assert handler._idempotency_id_factory() != handler._idempotency_id_factory()
+    assert handler._outbox_event_id_factory() != handler._outbox_event_id_factory()
     assert handler._clock().tzinfo is not None
 
     with pytest.raises(StopIteration):
