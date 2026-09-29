@@ -9,6 +9,11 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install --only-upgrade --no-install-recommends -y \
+        libpcre2-8-0=10.42-1+deb12u1 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid "${APP_GID}" app \
     && useradd \
         --uid "${APP_UID}" \
@@ -24,8 +29,9 @@ COPY src ./src
 COPY apps ./apps
 COPY tests ./tests
 
-RUN python -m pip install --no-cache-dir "uv==0.11.32" \
-    && uv sync --locked --all-extras \
+RUN /usr/local/bin/python -m pip install --no-cache-dir "uv==0.11.32" \
+    && uv sync --locked \
+    && /usr/local/bin/python -m pip uninstall -y setuptools pip \
     && chown -R app:app /app /opt/venv
 
 USER app
