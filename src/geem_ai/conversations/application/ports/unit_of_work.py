@@ -5,6 +5,7 @@ from typing import Protocol, Self
 from geem_ai.conversations.application.ports.repositories import (
     AssistantExecutionRepository,
     ConversationRepository,
+    IdempotencyRepository,
     MessageRepository,
 )
 from geem_ai.shared.domain.actor import Actor
@@ -14,6 +15,7 @@ class ConversationUnitOfWork(Protocol):
     conversations: ConversationRepository
     messages: MessageRepository
     executions: AssistantExecutionRepository
+    idempotency: IdempotencyRepository
 
     def __enter__(self) -> Self: ...
 

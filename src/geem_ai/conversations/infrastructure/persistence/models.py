@@ -6,6 +6,7 @@ from typing import cast
 from uuid import UUID
 
 from sqlalchemy import (
+    CHAR,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -104,6 +105,34 @@ class ConversationModel(Base):
             "tenant_id",
             "status",
         ),
+    )
+
+
+class IdempotencyRecordModel(Base):
+    __tablename__ = "idempotency_records"
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    scope: Mapped[str] = mapped_column(String(160), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    request_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_body: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    resource_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "scope", "idempotency_key", name="uq_idempotency_records__tenant_scope_key"
+        ),
+        CheckConstraint(
+            "status IN ('processing', 'completed', 'failed')", name="ck_idempotency_records__status"
+        ),
+        CheckConstraint("expires_at > created_at", name="ck_idempotency_records__expiration"),
     )
 
 
