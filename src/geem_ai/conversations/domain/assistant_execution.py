@@ -30,6 +30,8 @@ class AssistantExecution:
     assistant_message_id: MessageId | None
     status: ExecutionStatus
     capability: ExecutionCapability
+    created_at: datetime
+    updated_at: datetime
 
     provider: str | None = None
     model: str | None = None
@@ -56,6 +58,7 @@ class AssistantExecution:
         conversation_id: ConversationId,
         user_message_id: MessageId,
         capability: ExecutionCapability,
+        now: datetime,
     ) -> AssistantExecution:
         return cls(
             id=execution_id,
@@ -65,6 +68,8 @@ class AssistantExecution:
             assistant_message_id=None,
             status=ExecutionStatus.CREATED,
             capability=capability,
+            created_at=now,
+            updated_at=now,
         )
 
     def start(self, *, now: datetime) -> None:

@@ -1,12 +1,16 @@
 from typing import Protocol
 
 from geem_ai.conversations.application.views import ConversationView
+from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
+from geem_ai.conversations.domain.message import Message
 from geem_ai.shared.domain.ids import ConversationId, TenantId
 
 
 class ConversationRepository(Protocol):
     def add(self, conversation: Conversation) -> None: ...
+
+    def save(self, conversation: Conversation) -> None: ...
 
     def get_by_id(
         self,
@@ -19,6 +23,14 @@ class ConversationRepository(Protocol):
         tenant_id: TenantId,
         conversation_id: ConversationId,
     ) -> bool: ...
+
+
+class MessageRepository(Protocol):
+    def add(self, message: Message) -> None: ...
+
+
+class AssistantExecutionRepository(Protocol):
+    def add(self, execution: AssistantExecution) -> None: ...
 
 
 class ConversationReadRepository(Protocol):

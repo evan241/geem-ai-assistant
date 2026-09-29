@@ -29,6 +29,7 @@ def build_execution() -> AssistantExecution:
         conversation_id=ConversationId(uuid4()),
         user_message_id=MessageId(uuid4()),
         capability=ExecutionCapability.DIRECT_RESPONSE,
+        now=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 
