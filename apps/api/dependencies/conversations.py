@@ -4,7 +4,15 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from geem_ai.conversations.application.handlers import CreateConversationHandler
+from sqlalchemy.orm import Session
+
+from geem_ai.conversations.application.handlers import (
+    CreateConversationHandler,
+    GetConversationHandler,
+)
+from geem_ai.conversations.infrastructure.persistence.read_repository import (
+    SQLAlchemyConversationReadRepository,
+)
 from geem_ai.conversations.infrastructure.persistence.unit_of_work import (
     SQLAlchemyConversationUnitOfWorkFactory,
 )
@@ -25,5 +33,18 @@ def get_create_conversation_handler() -> Iterator[CreateConversationHandler]:
             conversation_id_factory=lambda: ConversationId(uuid4()),
             clock=lambda: datetime.now(UTC),
         )
+    finally:
+        engine.dispose()
+
+
+def get_get_conversation_handler() -> Iterator[GetConversationHandler]:
+    settings = get_settings()
+    engine = create_database_engine(settings.database_url)
+
+    try:
+        with Session(engine) as session:
+            yield GetConversationHandler(
+                repository=SQLAlchemyConversationReadRepository(session),
+            )
     finally:
         engine.dispose()
