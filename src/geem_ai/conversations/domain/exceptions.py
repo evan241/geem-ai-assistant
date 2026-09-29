@@ -10,6 +10,10 @@ class MessageContentLockedError(ConversationDomainError):
     """Raised when completed message content is modified."""
 
 
+class InvalidMessageContentError(ConversationDomainError):
+    """Raised when message content is invalid for its lifecycle state."""
+
+
 class AssistantExecutionDomainError(ConversationDomainError):
     """Base exception for assistant execution domain errors."""
 

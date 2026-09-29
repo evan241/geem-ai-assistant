@@ -4,7 +4,10 @@ from uuid import uuid4
 import pytest
 
 from geem_ai.conversations.domain.enums import MessageRole, MessageStatus
-from geem_ai.conversations.domain.exceptions import MessageContentLockedError
+from geem_ai.conversations.domain.exceptions import (
+    InvalidMessageContentError,
+    MessageContentLockedError,
+)
 from geem_ai.conversations.domain.message import Message
 from geem_ai.shared.domain.ids import ConversationId, MessageId, TenantId, UserId
 
@@ -25,6 +28,34 @@ def test_user_message_is_created_completed() -> None:
     assert message.status is MessageStatus.COMPLETED
     assert message.content == "Hola"
     assert message.created_at == now
+
+
+@pytest.mark.parametrize("content", ["", "   "])
+def test_user_message_rejects_empty_content(content: str) -> None:
+    with pytest.raises(InvalidMessageContentError):
+        Message.create_user(
+            message_id=MessageId(uuid4()),
+            conversation_id=ConversationId(uuid4()),
+            tenant_id=TenantId(uuid4()),
+            author_id=UserId(uuid4()),
+            content=content,
+            now=datetime.now(UTC),
+        )
+
+
+def test_user_message_preserves_non_empty_content() -> None:
+    content = "  Keep intentional spacing  "
+
+    message = Message.create_user(
+        message_id=MessageId(uuid4()),
+        conversation_id=ConversationId(uuid4()),
+        tenant_id=TenantId(uuid4()),
+        author_id=UserId(uuid4()),
+        content=content,
+        now=datetime.now(UTC),
+    )
+
+    assert message.content == content
 
 
 def test_completed_message_cannot_change_content() -> None:

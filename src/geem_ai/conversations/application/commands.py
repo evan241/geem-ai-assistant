@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from geem_ai.shared.domain.actor import Actor
+from geem_ai.shared.domain.ids import ConversationId
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,3 +12,11 @@ class CreateConversationCommand:
     title: str | None
     language: str
     idempotency_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SendConversationMessageCommand:
+    actor: Actor
+    conversation_id: ConversationId
+    content: str
+    capability_hint: str | None = None
