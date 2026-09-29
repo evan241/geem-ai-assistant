@@ -13,7 +13,32 @@ from geem_ai.conversations.infrastructure.persistence.models import (
     AssistantExecutionModel,
     ConversationModel,
     MessageModel,
+    OutboxEventModel,
 )
+
+
+def test_outbox_event_model_matches_persistence_contract() -> None:
+    table = cast(Table, OutboxEventModel.__table__)
+
+    assert table.name == "outbox_events"
+    assert isinstance(table.c.id.type, UUID)
+    assert isinstance(table.c.tenant_id.type, UUID)
+    assert isinstance(table.c.aggregate_id.type, UUID)
+    assert isinstance(table.c.payload.type, JSONB)
+    assert table.c.tenant_id.nullable is True
+    assert table.c.status.server_default is not None
+    assert table.c.attempt.server_default is not None
+
+    check_constraints = {
+        constraint.name
+        for constraint in table.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_outbox_events__status" in check_constraints
+    assert "ck_outbox_events__attempt" in check_constraints
+
+    indexes = {index.name for index in table.indexes if isinstance(index, Index)}
+    assert "ix_outbox_events__pending_available" in indexes
 
 
 def test_conversation_model_matches_persistence_contract() -> None:

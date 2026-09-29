@@ -21,6 +21,10 @@ from geem_ai.shared.domain.ids import (
     TenantId,
 )
 
+CREATED_AT = datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
+STARTED_AT = datetime(2026, 1, 1, 10, 1, tzinfo=UTC)
+COMPLETED_AT = datetime(2026, 1, 1, 10, 2, tzinfo=UTC)
+
 
 def build_execution() -> AssistantExecution:
     return AssistantExecution.create(
@@ -29,18 +33,26 @@ def build_execution() -> AssistantExecution:
         conversation_id=ConversationId(uuid4()),
         user_message_id=MessageId(uuid4()),
         capability=ExecutionCapability.DIRECT_RESPONSE,
+        now=CREATED_AT,
     )
+
+
+def test_execution_creation_initializes_domain_timestamps() -> None:
+    execution = build_execution()
+
+    assert execution.created_at == CREATED_AT
+    assert execution.updated_at == CREATED_AT
 
 
 def test_execution_can_transition_from_created_to_running_to_completed() -> None:
     execution = build_execution()
-    started_at = datetime.now(UTC)
-    completed_at = datetime.now(UTC)
 
-    execution.start(now=started_at)
+    execution.start(now=STARTED_AT)
 
     assert execution.status is ExecutionStatus.RUNNING
-    assert execution.started_at == started_at
+    assert execution.started_at == STARTED_AT
+    assert execution.created_at == CREATED_AT
+    assert execution.updated_at == STARTED_AT
 
     assistant_message_id = MessageId(uuid4())
 
@@ -53,7 +65,7 @@ def test_execution_can_transition_from_created_to_running_to_completed() -> None
         total_tokens=15,
         cost_amount=0.001,
         latency_ms=250,
-        now=completed_at,
+        now=COMPLETED_AT,
     )
 
     assert execution.status is ExecutionStatus.COMPLETED
@@ -63,7 +75,25 @@ def test_execution_can_transition_from_created_to_running_to_completed() -> None
     assert execution.total_tokens == 15
     assert execution.cost_amount == 0.001
     assert execution.latency_ms == 250
-    assert execution.completed_at == completed_at
+    assert execution.completed_at == COMPLETED_AT
+    assert execution.created_at == CREATED_AT
+    assert execution.updated_at == COMPLETED_AT
+
+
+def test_failing_execution_updates_timestamp_without_changing_creation_time() -> None:
+    execution = build_execution()
+    execution.start(now=STARTED_AT)
+
+    execution.fail(
+        failure_code="provider_error",
+        failure_detail="Provider unavailable",
+        now=COMPLETED_AT,
+    )
+
+    assert execution.status is ExecutionStatus.FAILED
+    assert execution.completed_at == COMPLETED_AT
+    assert execution.created_at == CREATED_AT
+    assert execution.updated_at == COMPLETED_AT
 
 
 def test_execution_cannot_complete_without_result() -> None:
@@ -148,13 +178,14 @@ def test_completed_execution_cannot_start_again() -> None:
 
 def test_running_execution_can_be_cancelled() -> None:
     execution = build_execution()
-    now = datetime.now(UTC)
 
-    execution.start(now=now)
-    execution.cancel(now=now)
+    execution.start(now=STARTED_AT)
+    execution.cancel(now=COMPLETED_AT)
 
     assert execution.status is ExecutionStatus.CANCELLED
-    assert execution.completed_at == now
+    assert execution.completed_at == COMPLETED_AT
+    assert execution.created_at == CREATED_AT
+    assert execution.updated_at == COMPLETED_AT
 
 
 def test_completed_execution_cannot_be_cancelled() -> None:

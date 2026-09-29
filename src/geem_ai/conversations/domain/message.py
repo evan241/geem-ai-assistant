@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from geem_ai.conversations.domain.enums import MessageRole, MessageStatus
-from geem_ai.conversations.domain.exceptions import MessageContentLockedError
+from geem_ai.conversations.domain.exceptions import (
+    InvalidMessageContentError,
+    MessageContentLockedError,
+)
 from geem_ai.shared.domain.ids import (
     ConversationId,
     ExecutionId,
@@ -38,6 +41,9 @@ class Message:
         content: str,
         now: datetime,
     ) -> Message:
+        if not content.strip():
+            raise InvalidMessageContentError("Completed user message content cannot be empty.")
+
         return cls(
             id=message_id,
             conversation_id=conversation_id,
