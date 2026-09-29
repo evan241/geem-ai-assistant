@@ -31,7 +31,7 @@ FROM base AS builder
 RUN pnpm build
 
 
-FROM nginxinc/nginx-unprivileged:alpine@sha256:18d67281256ded39ff65e010ae4f831be18f19356f83c60bc546492c7eb6dd23 AS production
+FROM nginxinc/nginx-unprivileged:1.30.5-alpine3.24@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e AS production
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 

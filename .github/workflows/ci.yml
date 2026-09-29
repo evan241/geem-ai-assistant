@@ -43,6 +43,12 @@ jobs:
       GEEM_DEV_AUTH_ENABLED: "false"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build MinIO test image from the official release
+        run: |
+          docker build \
+            -f docker/minio.Dockerfile \
+            -t geem-ai-assistant-minio:RELEASE.2025-09-07T16-13-09Z \
+            .
       - name: Start MinIO
         run: |
           docker run -d --rm \
@@ -50,7 +56,7 @@ jobs:
             -e MINIO_ROOT_USER=geem_ai \
             -e MINIO_ROOT_PASSWORD=geem_ai_dev_secret \
             -p 9000:9000 \
-            minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
+            geem-ai-assistant-minio:RELEASE.2025-09-07T16-13-09Z \
             server /data
       - name: Wait for MinIO
         run: |
