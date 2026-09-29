@@ -8,7 +8,7 @@ from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.message import Message
-from geem_ai.shared.domain.ids import ConversationId, TenantId
+from geem_ai.shared.domain.ids import ConversationId, ExecutionId, TenantId
 
 
 class ConversationRepository(Protocol):
@@ -35,6 +35,14 @@ class MessageRepository(Protocol):
 
 class AssistantExecutionRepository(Protocol):
     def add(self, execution: AssistantExecution) -> None: ...
+
+    def get_for_update(
+        self,
+        tenant_id: TenantId,
+        execution_id: ExecutionId,
+    ) -> AssistantExecution | None: ...
+
+    def save(self, execution: AssistantExecution) -> None: ...
 
 
 class OutboxRepository(Protocol):

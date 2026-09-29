@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.shared.domain.ids import ConversationId, ExecutionId, MessageId
 
 
@@ -23,3 +24,8 @@ class SendConversationMessageResult:
     assistant_execution_id: ExecutionId
     execution_status: str
     capability: str
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimAssistantExecutionResult:
+    execution: AssistantExecution

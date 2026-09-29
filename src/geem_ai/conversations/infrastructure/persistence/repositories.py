@@ -18,6 +18,8 @@ from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.enums import (
     ConversationLanguage,
     ConversationStatus,
+    ExecutionCapability,
+    ExecutionStatus,
 )
 from geem_ai.conversations.domain.message import Message
 from geem_ai.conversations.infrastructure.persistence.models import (
@@ -27,7 +29,13 @@ from geem_ai.conversations.infrastructure.persistence.models import (
     MessageModel,
     OutboxEventModel,
 )
-from geem_ai.shared.domain.ids import ConversationId, TenantId, UserId
+from geem_ai.shared.domain.ids import (
+    ConversationId,
+    ExecutionId,
+    MessageId,
+    TenantId,
+    UserId,
+)
 
 
 class SQLAlchemyConversationRepository:
@@ -287,3 +295,81 @@ class SQLAlchemyAssistantExecutionRepository:
             updated_at=execution.updated_at,
         )
         self._session.add(model)
+
+    def get_for_update(
+        self,
+        tenant_id: TenantId,
+        execution_id: ExecutionId,
+    ) -> AssistantExecution | None:
+        statement = (
+            select(AssistantExecutionModel)
+            .where(
+                AssistantExecutionModel.tenant_id == tenant_id.value,
+                AssistantExecutionModel.id == execution_id.value,
+            )
+            .with_for_update()
+        )
+        model = self._session.scalar(statement)
+        return None if model is None else self._to_domain(model)
+
+    def save(self, execution: AssistantExecution) -> None:
+        statement = (
+            update(AssistantExecutionModel)
+            .where(
+                AssistantExecutionModel.tenant_id == execution.tenant_id.value,
+                AssistantExecutionModel.id == execution.id.value,
+            )
+            .values(
+                status=execution.status.value,
+                assistant_message_id=(
+                    execution.assistant_message_id.value
+                    if execution.assistant_message_id is not None
+                    else None
+                ),
+                provider=execution.provider,
+                model=execution.model,
+                input_tokens=execution.input_tokens,
+                output_tokens=execution.output_tokens,
+                total_tokens=execution.total_tokens,
+                cost_amount=execution.cost_amount,
+                latency_ms=execution.latency_ms,
+                failure_code=execution.failure_code,
+                failure_detail=execution.failure_detail,
+                started_at=execution.started_at,
+                completed_at=execution.completed_at,
+                updated_at=execution.updated_at,
+            )
+        )
+        self._session.execute(statement)
+
+    @staticmethod
+    def _to_domain(model: AssistantExecutionModel) -> AssistantExecution:
+        if model.user_message_id is None:
+            raise ValueError("Assistant execution must reference a user message.")
+
+        return AssistantExecution(
+            id=ExecutionId(model.id),
+            tenant_id=TenantId(model.tenant_id),
+            conversation_id=ConversationId(model.conversation_id),
+            user_message_id=MessageId(model.user_message_id),
+            assistant_message_id=(
+                MessageId(model.assistant_message_id)
+                if model.assistant_message_id is not None
+                else None
+            ),
+            status=ExecutionStatus(model.status),
+            capability=ExecutionCapability(model.capability),
+            provider=model.provider,
+            model=model.model,
+            input_tokens=model.input_tokens,
+            output_tokens=model.output_tokens,
+            total_tokens=model.total_tokens,
+            cost_amount=float(model.cost_amount) if model.cost_amount is not None else None,
+            latency_ms=model.latency_ms,
+            failure_code=model.failure_code,
+            failure_detail=model.failure_detail,
+            started_at=model.started_at,
+            completed_at=model.completed_at,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
