@@ -8,7 +8,7 @@ from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.message import Message
-from geem_ai.shared.domain.ids import ConversationId, ExecutionId, TenantId
+from geem_ai.shared.domain.ids import ConversationId, ExecutionId, MessageId, TenantId
 
 
 class ConversationRepository(Protocol):
@@ -31,6 +31,21 @@ class ConversationRepository(Protocol):
 
 class MessageRepository(Protocol):
     def add(self, message: Message) -> None: ...
+
+    def list_recent_for_execution(
+        self,
+        tenant_id: TenantId,
+        conversation_id: ConversationId,
+        *,
+        limit: int,
+    ) -> tuple[Message, ...]: ...
+
+    def get_for_execution(
+        self,
+        tenant_id: TenantId,
+        conversation_id: ConversationId,
+        message_id: MessageId,
+    ) -> Message | None: ...
 
 
 class AssistantExecutionRepository(Protocol):
