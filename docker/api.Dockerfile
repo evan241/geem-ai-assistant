@@ -29,14 +29,9 @@ COPY src ./src
 COPY apps ./apps
 COPY tests ./tests
 
-RUN python -m pip install --no-cache-dir \
-        "setuptools>=78.1.1" \
-        "uv==0.11.32" \
-    && uv sync --locked --all-extras \
-    && find /usr/local /opt/venv \
-        -path "*/pip/_vendor/bom.cdx.json" \
-        -type f \
-        -delete \
+RUN /usr/local/bin/python -m pip install --no-cache-dir "uv==0.11.32" \
+    && uv sync --locked \
+    && /usr/local/bin/python -m pip uninstall -y setuptools pip \
     && chown -R app:app /app /opt/venv
 
 USER app
