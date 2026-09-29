@@ -20,6 +20,7 @@ def test_send_conversation_message_command_is_immutable_and_slotted() -> None:
         actor=Actor.user(tenant_id=TenantId(uuid4()), user_id=UserId(uuid4())),
         conversation_id=ConversationId(uuid4()),
         content="hello",
+        idempotency_key="request-key",
     )
 
     assert command.capability_hint is None

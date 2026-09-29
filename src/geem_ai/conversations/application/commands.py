@@ -19,4 +19,5 @@ class SendConversationMessageCommand:
     actor: Actor
     conversation_id: ConversationId
     content: str
+    idempotency_key: str
     capability_hint: str | None = None

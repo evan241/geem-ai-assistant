@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from datetime import datetime
+from typing import cast
+from uuid import UUID
+
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from geem_ai.conversations.application.idempotency import (
+    IdempotencyRecord,
+    IdempotencyStatus,
+)
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.enums import (
@@ -13,6 +21,7 @@ from geem_ai.conversations.domain.message import Message
 from geem_ai.conversations.infrastructure.persistence.models import (
     AssistantExecutionModel,
     ConversationModel,
+    IdempotencyRecordModel,
     MessageModel,
 )
 from geem_ai.shared.domain.ids import ConversationId, TenantId, UserId
@@ -99,6 +108,89 @@ class SQLAlchemyConversationRepository:
             updated_at=model.updated_at,
             last_message_at=model.last_message_at,
             version=model.version,
+        )
+
+
+class SQLAlchemyIdempotencyRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, tenant_id: TenantId, scope: str, key: str) -> IdempotencyRecord | None:
+        model = self._session.scalar(
+            select(IdempotencyRecordModel).where(
+                IdempotencyRecordModel.tenant_id == tenant_id.value,
+                IdempotencyRecordModel.scope == scope,
+                IdempotencyRecordModel.idempotency_key == key,
+            )
+        )
+        return None if model is None else self._to_record(model)
+
+    def add(self, record: IdempotencyRecord) -> None:
+        self._session.add(IdempotencyRecordModel(**self._values(record)))
+
+    def complete(
+        self,
+        record: IdempotencyRecord,
+        *,
+        response_status: int,
+        response_body: dict[str, object],
+        resource_type: str,
+        resource_id: UUID,
+        completed_at: datetime,
+    ) -> None:
+        record.status = "completed"
+        record.response_status = response_status
+        record.response_body = response_body
+        record.resource_type = resource_type
+        record.resource_id = resource_id
+        record.completed_at = completed_at
+        self._session.execute(
+            update(IdempotencyRecordModel)
+            .where(IdempotencyRecordModel.id == record.id)
+            .values(
+                status="completed",
+                response_status=response_status,
+                response_body=response_body,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                completed_at=completed_at,
+            )
+        )
+
+    @staticmethod
+    def _values(record: IdempotencyRecord) -> dict[str, object]:
+        return {
+            "id": record.id,
+            "tenant_id": record.tenant_id,
+            "scope": record.scope,
+            "idempotency_key": record.idempotency_key,
+            "request_hash": record.request_hash,
+            "status": record.status,
+            "response_status": record.response_status,
+            "response_body": record.response_body,
+            "resource_type": record.resource_type,
+            "resource_id": record.resource_id,
+            "created_at": record.created_at,
+            "completed_at": record.completed_at,
+            "expires_at": record.expires_at,
+        }
+
+    @staticmethod
+    def _to_record(model: IdempotencyRecordModel) -> IdempotencyRecord:
+        return IdempotencyRecord(
+            id=model.id,
+            tenant_id=model.tenant_id,
+            scope=model.scope,
+            idempotency_key=model.idempotency_key,
+            request_hash=model.request_hash,
+            status=cast(IdempotencyStatus, model.status),
+            response_status=model.response_status,
+            response_body=model.response_body,
+            resource_type=model.resource_type,
+            resource_id=model.resource_id,
+            created_at=model.created_at,
+            completed_at=model.completed_at,
+            expires_at=model.expires_at,
         )
 
 

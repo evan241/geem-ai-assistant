@@ -1,5 +1,8 @@
+from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
+from geem_ai.conversations.application.idempotency import IdempotencyRecord
 from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
@@ -31,6 +34,23 @@ class MessageRepository(Protocol):
 
 class AssistantExecutionRepository(Protocol):
     def add(self, execution: AssistantExecution) -> None: ...
+
+
+class IdempotencyRepository(Protocol):
+    def get(self, tenant_id: TenantId, scope: str, key: str) -> IdempotencyRecord | None: ...
+
+    def add(self, record: IdempotencyRecord) -> None: ...
+
+    def complete(
+        self,
+        record: IdempotencyRecord,
+        *,
+        response_status: int,
+        response_body: dict[str, object],
+        resource_type: str,
+        resource_id: UUID,
+        completed_at: datetime,
+    ) -> None: ...
 
 
 class ConversationReadRepository(Protocol):

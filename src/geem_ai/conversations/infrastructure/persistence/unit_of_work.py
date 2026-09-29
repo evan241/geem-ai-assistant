@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 from geem_ai.conversations.application.ports.repositories import (
     AssistantExecutionRepository,
     ConversationRepository,
+    IdempotencyRepository,
     MessageRepository,
 )
 from geem_ai.conversations.infrastructure.persistence.repositories import (
     SQLAlchemyAssistantExecutionRepository,
     SQLAlchemyConversationRepository,
+    SQLAlchemyIdempotencyRepository,
     SQLAlchemyMessageRepository,
 )
 from geem_ai.shared.domain.actor import Actor
@@ -35,6 +37,7 @@ class SQLAlchemyConversationUnitOfWork:
         self.executions: AssistantExecutionRepository = SQLAlchemyAssistantExecutionRepository(
             self.session
         )
+        self.idempotency: IdempotencyRepository = SQLAlchemyIdempotencyRepository(self.session)
 
     def __enter__(self) -> Self:
         self._set_actor_context()

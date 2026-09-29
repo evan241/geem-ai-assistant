@@ -7,9 +7,11 @@ import pytest
 from geem_ai.conversations.application.commands import SendConversationMessageCommand
 from geem_ai.conversations.application.exceptions import ConversationNotFoundError
 from geem_ai.conversations.application.handlers import SendConversationMessageHandler
+from geem_ai.conversations.application.idempotency import IdempotencyRecord
 from geem_ai.conversations.application.ports.repositories import (
     AssistantExecutionRepository,
     ConversationRepository,
+    IdempotencyRepository,
     MessageRepository,
 )
 from geem_ai.conversations.application.ports.unit_of_work import ConversationUnitOfWork
@@ -76,6 +78,32 @@ class FakeAssistantExecutionRepository:
         self.added.append(execution)
 
 
+class FakeIdempotencyRepository:
+    def __init__(self) -> None:
+        self.records: list[IdempotencyRecord] = []
+
+    def get(self, tenant_id: TenantId, scope: str, key: str) -> IdempotencyRecord | None:
+        return next(
+            (
+                record
+                for record in self.records
+                if record.tenant_id == tenant_id.value
+                and record.scope == scope
+                and record.idempotency_key == key
+            ),
+            None,
+        )
+
+    def add(self, record: IdempotencyRecord) -> None:
+        self.records.append(record)
+
+    def complete(self, record: IdempotencyRecord, **values: object) -> None:
+        record.status = "completed"
+        record.response_status = int(values["response_status"])
+        record.response_body = values["response_body"]  # type: ignore[assignment]
+        record.completed_at = values["completed_at"]  # type: ignore[assignment]
+
+
 class FakeConversationUnitOfWork:
     def __init__(self, conversations: list[Conversation]) -> None:
         self.conversation_repository = FakeConversationRepository(conversations)
@@ -84,6 +112,8 @@ class FakeConversationUnitOfWork:
         self.conversations: ConversationRepository = self.conversation_repository
         self.messages: MessageRepository = self.message_repository
         self.executions: AssistantExecutionRepository = self.execution_repository
+        self.idempotency_repository = FakeIdempotencyRepository()
+        self.idempotency: IdempotencyRepository = self.idempotency_repository
         self.commit_count = 0
         self.rollback_count = 0
 
@@ -164,6 +194,7 @@ def test_accepts_message_and_creates_pending_execution_atomically() -> None:
             actor=actor,
             conversation_id=conversation.id,
             content="How do I install it?",
+            idempotency_key="request-key",
         )
     )
 
@@ -213,7 +244,10 @@ def test_requires_user_actor_before_opening_unit_of_work() -> None:
     with pytest.raises(ValueError, match="User actor is required"):
         handler.handle(
             SendConversationMessageCommand(
-                actor=actor, conversation_id=ConversationId(uuid4()), content="hello"
+                actor=actor,
+                conversation_id=ConversationId(uuid4()),
+                content="hello",
+                idempotency_key="request-key",
             )
         )
 
@@ -232,7 +266,10 @@ def test_invisible_conversation_raises_same_not_found_error(cross_tenant: bool) 
     with pytest.raises(ConversationNotFoundError):
         handler.handle(
             SendConversationMessageCommand(
-                actor=actor, conversation_id=conversation.id, content="hello"
+                actor=actor,
+                conversation_id=conversation.id,
+                content="hello",
+                idempotency_key="request-key",
             )
         )
 
@@ -251,7 +288,10 @@ def test_inactive_conversation_uses_domain_rejection(status: ConversationStatus)
     with pytest.raises(ConversationNotActiveError):
         handler.handle(
             SendConversationMessageCommand(
-                actor=actor, conversation_id=conversation.id, content="hello"
+                actor=actor,
+                conversation_id=conversation.id,
+                content="hello",
+                idempotency_key="request-key",
             )
         )
 
@@ -270,6 +310,7 @@ def test_rejects_unsupported_capability_before_opening_unit_of_work() -> None:
                 actor=actor,
                 conversation_id=conversation.id,
                 content="hello",
+                idempotency_key="request-key",
                 capability_hint="knowledge_query",
             )
         )
@@ -290,6 +331,7 @@ def test_invalid_user_message_is_not_persisted_or_committed() -> None:
                 actor=actor,
                 conversation_id=conversation.id,
                 content="   ",
+                idempotency_key="request-key",
             )
         )
 
@@ -309,6 +351,7 @@ def test_accepts_explicit_direct_response_and_uses_supplied_factories() -> None:
             actor=actor,
             conversation_id=conversation.id,
             content="hello",
+            idempotency_key="request-key",
             capability_hint="direct_response",
         )
     )
@@ -322,3 +365,139 @@ def assert_no_writes_or_commit(unit_of_work: FakeConversationUnitOfWork) -> None
     assert unit_of_work.message_repository.added == []
     assert unit_of_work.execution_repository.added == []
     assert unit_of_work.commit_count == 0
+
+
+def test_replay_returns_stored_result_without_new_business_effects() -> None:
+    actor = build_actor()
+    conversation = build_conversation(actor)
+    unit_of_work = FakeConversationUnitOfWork([conversation])
+    handler, _, _, _ = build_handler(unit_of_work)
+    command = SendConversationMessageCommand(
+        actor=actor,
+        conversation_id=conversation.id,
+        content="  preserve me  ",
+        idempotency_key="replay-key",
+    )
+
+    first = handler.handle(command)
+    replayed = handler.handle(command)
+
+    assert replayed == first
+    assert len(unit_of_work.message_repository.added) == 1
+    assert len(unit_of_work.execution_repository.added) == 1
+    assert len(unit_of_work.conversation_repository.saved) == 1
+    assert unit_of_work.commit_count == 1
+    record = unit_of_work.idempotency_repository.records[0]
+    assert record.status == "completed"
+    assert record.response_body == {
+        "assistant_execution_id": str(first.assistant_execution_id.value),
+        "capability": "direct_response",
+        "execution_status": "created",
+        "user_message_id": str(first.user_message_id.value),
+    }
+    assert "preserve me" not in str(record.response_body)
+
+
+@pytest.mark.parametrize(
+    ("changed_conversation", "changed_content", "changed_capability"),
+    [(False, True, False), (True, False, False), (False, False, True)],
+)
+def test_reused_key_with_different_logical_payload_conflicts(
+    changed_conversation: bool, changed_content: bool, changed_capability: bool
+) -> None:
+    actor = build_actor()
+    conversation = build_conversation(actor)
+    other_conversation = build_conversation(actor)
+    unit_of_work = FakeConversationUnitOfWork([conversation, other_conversation])
+    handler, _, _, _ = build_handler(unit_of_work)
+    original = SendConversationMessageCommand(
+        actor=actor,
+        conversation_id=conversation.id,
+        content="hello",
+        idempotency_key="one-key",
+    )
+    handler.handle(original)
+
+    from geem_ai.conversations.application.exceptions import IdempotencyKeyConflictError
+    from geem_ai.conversations.domain.enums import ExecutionCapability
+
+    if changed_capability:
+        handler._resolve_capability = lambda _: ExecutionCapability.KNOWLEDGE_QUERY  # type: ignore[method-assign]
+
+    with pytest.raises(IdempotencyKeyConflictError):
+        handler.handle(
+            SendConversationMessageCommand(
+                actor=actor,
+                conversation_id=other_conversation.id if changed_conversation else conversation.id,
+                content="changed" if changed_content else "hello",
+                idempotency_key="one-key",
+                capability_hint="knowledge_query" if changed_capability else None,
+            )
+        )
+
+
+def test_processing_identical_request_raises_in_progress() -> None:
+    from geem_ai.conversations.application.exceptions import IdempotencyRequestInProgressError
+
+    actor = build_actor()
+    conversation = build_conversation(actor)
+    unit_of_work = FakeConversationUnitOfWork([conversation])
+    handler, _, _, _ = build_handler(unit_of_work)
+    command = SendConversationMessageCommand(
+        actor=actor, conversation_id=conversation.id, content="hello", idempotency_key="busy"
+    )
+    handler.handle(command)
+    unit_of_work.idempotency_repository.records[0].status = "processing"
+
+    with pytest.raises(IdempotencyRequestInProgressError):
+        handler.handle(command)
+    assert unit_of_work.commit_count == 1
+
+
+@pytest.mark.parametrize("key", ["", "   ", "x" * 256])
+def test_invalid_idempotency_key_is_rejected_before_opening_uow(key: str) -> None:
+    from geem_ai.conversations.application.exceptions import InvalidIdempotencyKeyError
+
+    actor = build_actor()
+    unit_of_work = FakeConversationUnitOfWork([])
+    handler, _, _, factory = build_handler(unit_of_work)
+    with pytest.raises(InvalidIdempotencyKeyError):
+        handler.handle(
+            SendConversationMessageCommand(
+                actor=actor,
+                conversation_id=ConversationId(uuid4()),
+                content="hello",
+                idempotency_key=key,
+            )
+        )
+    assert factory.actors == []
+    assert_no_writes_or_commit(unit_of_work)
+
+
+def test_different_tenants_can_use_the_same_key_independently() -> None:
+    first_actor = build_actor()
+    second_actor = build_actor()
+    first_conversation = build_conversation(first_actor)
+    second_conversation = build_conversation(second_actor)
+    unit_of_work = FakeConversationUnitOfWork([first_conversation, second_conversation])
+    handler, _, _, _ = build_handler(unit_of_work)
+
+    for actor, conversation in (
+        (first_actor, first_conversation),
+        (second_actor, second_conversation),
+    ):
+        handler.handle(
+            SendConversationMessageCommand(
+                actor=actor,
+                conversation_id=conversation.id,
+                content="hello",
+                idempotency_key="shared-key",
+            )
+        )
+
+    assert len(unit_of_work.idempotency_repository.records) == 2
+    assert {record.tenant_id for record in unit_of_work.idempotency_repository.records} == {
+        first_actor.tenant_id.value,
+        second_actor.tenant_id.value,
+    }
+    assert unit_of_work.commit_count == 2
