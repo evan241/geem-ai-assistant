@@ -16,7 +16,10 @@ from geem_ai.conversations.application.ports.unit_of_work import ConversationUni
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.enums import ConversationStatus
-from geem_ai.conversations.domain.exceptions import ConversationNotActiveError
+from geem_ai.conversations.domain.exceptions import (
+    ConversationNotActiveError,
+    InvalidMessageContentError,
+)
 from geem_ai.conversations.domain.message import Message
 from geem_ai.shared.domain.actor import Actor, ActorType
 from geem_ai.shared.domain.ids import (
@@ -272,6 +275,24 @@ def test_rejects_unsupported_capability_before_opening_unit_of_work() -> None:
         )
 
     assert factory.actors == []
+    assert_no_writes_or_commit(unit_of_work)
+
+
+def test_invalid_user_message_is_not_persisted_or_committed() -> None:
+    actor = build_actor()
+    conversation = build_conversation(actor)
+    unit_of_work = FakeConversationUnitOfWork([conversation])
+    handler, _, _, _ = build_handler(unit_of_work)
+
+    with pytest.raises(InvalidMessageContentError):
+        handler.handle(
+            SendConversationMessageCommand(
+                actor=actor,
+                conversation_id=conversation.id,
+                content="   ",
+            )
+        )
+
     assert_no_writes_or_commit(unit_of_work)
 
 
