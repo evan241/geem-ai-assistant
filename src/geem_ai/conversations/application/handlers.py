@@ -6,6 +6,7 @@ from uuid import UUID
 
 from geem_ai.conversations.application.commands import (
     ClaimAssistantExecutionCommand,
+    CompleteAssistantExecutionCommand,
     CreateConversationCommand,
     SendConversationMessageCommand,
 )
@@ -41,6 +42,7 @@ from geem_ai.conversations.application.views import ConversationView
 from geem_ai.conversations.domain.assistant_execution import AssistantExecution
 from geem_ai.conversations.domain.conversation import Conversation
 from geem_ai.conversations.domain.enums import ExecutionCapability
+from geem_ai.conversations.domain.message import Message
 from geem_ai.shared.domain.ids import ConversationId, ExecutionId, MessageId
 
 
@@ -67,6 +69,53 @@ class ClaimAssistantExecutionHandler:
             unit_of_work.commit()
 
         return ClaimAssistantExecutionResult(execution=execution)
+
+
+class CompleteAssistantExecutionHandler:
+    """Atomically persist the final message and its execution completion."""
+
+    def __init__(
+        self,
+        *,
+        unit_of_work_factory: ConversationUnitOfWorkFactory,
+        clock: Callable[[], datetime],
+    ) -> None:
+        self._unit_of_work_factory = unit_of_work_factory
+        self._clock = clock
+
+    def handle(self, command: CompleteAssistantExecutionCommand) -> None:
+        with self._unit_of_work_factory.create(command.actor) as unit_of_work:
+            execution = unit_of_work.executions.get_for_update(
+                command.actor.tenant_id, command.execution_id
+            )
+            if execution is None:
+                raise AssistantExecutionNotFoundError()
+
+            completed_at = self._clock()
+            assistant_message = Message.create_assistant(
+                message_id=command.assistant_message_id,
+                conversation_id=execution.conversation_id,
+                tenant_id=execution.tenant_id,
+                content=command.result.content,
+                execution_id=execution.id,
+                now=completed_at,
+            )
+            assistant_message.complete(now=completed_at)
+            execution.complete(
+                assistant_message_id=assistant_message.id,
+                provider=command.result.provider,
+                model=command.result.model,
+                input_tokens=command.result.usage.input_tokens,
+                output_tokens=command.result.usage.output_tokens,
+                total_tokens=command.result.usage.total_tokens,
+                cost_amount=command.result.estimated_cost,
+                latency_ms=command.result.latency_ms,
+                now=completed_at,
+            )
+
+            unit_of_work.messages.add(assistant_message)
+            unit_of_work.executions.save(execution)
+            unit_of_work.commit()
 
 
 class CreateConversationHandler:
