@@ -35,3 +35,17 @@ class Actor:
             user_id=user_id,
             roles=roles,
         )
+
+    @classmethod
+    def worker(
+        cls,
+        *,
+        tenant_id: TenantId,
+        roles: frozenset[str] = frozenset(),
+    ) -> Actor:
+        return cls(
+            actor_type=ActorType.WORKER,
+            tenant_id=tenant_id,
+            user_id=None,
+            roles=roles,
+        )
