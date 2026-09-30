@@ -30,3 +30,14 @@ def test_user_actor_requires_user_id() -> None:
     )
 
     assert actor.user_id is not None
+
+
+def test_worker_actor_preserves_tenant_and_roles_without_user() -> None:
+    tenant_id = TenantId(uuid4())
+
+    actor = Actor.worker(tenant_id=tenant_id, roles=frozenset({"assistant-executor"}))
+
+    assert actor.actor_type is ActorType.WORKER
+    assert actor.tenant_id == tenant_id
+    assert actor.user_id is None
+    assert actor.roles == frozenset({"assistant-executor"})
