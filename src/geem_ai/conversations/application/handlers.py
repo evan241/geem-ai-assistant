@@ -8,6 +8,7 @@ from geem_ai.conversations.application.commands import (
     ClaimAssistantExecutionCommand,
     CompleteAssistantExecutionCommand,
     CreateConversationCommand,
+    FailAssistantExecutionCommand,
     SendConversationMessageCommand,
 )
 from geem_ai.conversations.application.events import assistant_execution_requested
@@ -114,6 +115,35 @@ class CompleteAssistantExecutionHandler:
             )
 
             unit_of_work.messages.add(assistant_message)
+            unit_of_work.executions.save(execution)
+            unit_of_work.commit()
+
+
+class FailAssistantExecutionHandler:
+    """Persist a safe terminal failure for a running execution."""
+
+    def __init__(
+        self,
+        *,
+        unit_of_work_factory: ConversationUnitOfWorkFactory,
+        clock: Callable[[], datetime],
+    ) -> None:
+        self._unit_of_work_factory = unit_of_work_factory
+        self._clock = clock
+
+    def handle(self, command: FailAssistantExecutionCommand) -> None:
+        with self._unit_of_work_factory.create(command.actor) as unit_of_work:
+            execution = unit_of_work.executions.get_for_update(
+                command.actor.tenant_id, command.execution_id
+            )
+            if execution is None:
+                raise AssistantExecutionNotFoundError()
+
+            execution.fail(
+                failure_code=command.failure_code,
+                failure_detail=command.safe_detail,
+                now=self._clock(),
+            )
             unit_of_work.executions.save(execution)
             unit_of_work.commit()
 
