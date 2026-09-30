@@ -20,6 +20,8 @@ from geem_ai.conversations.domain.enums import (
     ConversationStatus,
     ExecutionCapability,
     ExecutionStatus,
+    MessageRole,
+    MessageStatus,
 )
 from geem_ai.conversations.domain.message import Message
 from geem_ai.conversations.infrastructure.persistence.models import (
@@ -235,6 +237,59 @@ class SQLAlchemyMessageRepository:
             completed_at=message.completed_at,
         )
         self._session.add(model)
+
+    def list_recent_for_execution(
+        self,
+        tenant_id: TenantId,
+        conversation_id: ConversationId,
+        *,
+        limit: int,
+    ) -> tuple[Message, ...]:
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        statement = (
+            select(MessageModel)
+            .where(
+                MessageModel.tenant_id == tenant_id.value,
+                MessageModel.conversation_id == conversation_id.value,
+            )
+            .order_by(MessageModel.created_at.desc(), MessageModel.id.desc())
+            .limit(limit)
+        )
+        newest_first = self._session.scalars(statement).all()
+        return tuple(self._to_domain(model) for model in reversed(newest_first))
+
+    def get_for_execution(
+        self,
+        tenant_id: TenantId,
+        conversation_id: ConversationId,
+        message_id: MessageId,
+    ) -> Message | None:
+        model = self._session.scalar(
+            select(MessageModel).where(
+                MessageModel.tenant_id == tenant_id.value,
+                MessageModel.conversation_id == conversation_id.value,
+                MessageModel.id == message_id.value,
+            )
+        )
+        return None if model is None else self._to_domain(model)
+
+    @staticmethod
+    def _to_domain(model: MessageModel) -> Message:
+        return Message(
+            id=MessageId(model.id),
+            tenant_id=TenantId(model.tenant_id),
+            conversation_id=ConversationId(model.conversation_id),
+            author_id=UserId(model.author_id) if model.author_id is not None else None,
+            role=MessageRole(model.role),
+            content=model.content,
+            status=MessageStatus(model.status),
+            execution_id=(
+                ExecutionId(model.execution_id) if model.execution_id is not None else None
+            ),
+            created_at=model.created_at,
+            completed_at=model.completed_at,
+        )
 
 
 class SQLAlchemyOutboxRepository:

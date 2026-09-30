@@ -6,6 +6,14 @@ class AssistantExecutionNotFoundError(Exception):
     """Raised when an assistant execution is not found or is not visible."""
 
 
+class ExecutionUserMessageNotFoundError(Exception):
+    """Raised when an execution's user message is absent from its tenant conversation."""
+
+
+class UnsupportedExecutionCapabilityError(Exception):
+    """Raised when orchestration does not support an execution capability."""
+
+
 class InvalidIdempotencyKeyError(ValueError):
     """Raised when an idempotency key is empty or exceeds its storage limit."""
 
