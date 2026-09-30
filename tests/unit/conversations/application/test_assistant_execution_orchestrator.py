@@ -141,6 +141,7 @@ def test_success_sequence_uses_exact_request_and_deterministic_message_id() -> N
         complete_handler=CompleteAssistantExecutionHandler(
             unit_of_work_factory=factory, clock=lambda: NOW
         ),  # type: ignore[arg-type]
+        fail_handler=None,  # type: ignore[arg-type]
         message_id_factory=lambda: message_id,
     )
 

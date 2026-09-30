@@ -6,6 +6,10 @@ class AssistantExecutionNotFoundError(Exception):
     """Raised when an assistant execution is not found or is not visible."""
 
 
+class AssistantExecutionNotClaimableError(Exception):
+    """Raised when an assistant execution job has already been claimed or handled."""
+
+
 class ExecutionUserMessageNotFoundError(Exception):
     """Raised when an execution's user message is absent from its tenant conversation."""
 

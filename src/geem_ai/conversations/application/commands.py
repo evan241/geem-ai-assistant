@@ -36,3 +36,11 @@ class CompleteAssistantExecutionCommand:
     execution_id: ExecutionId
     result: ModelExecutionResult
     assistant_message_id: MessageId
+
+
+@dataclass(frozen=True, slots=True)
+class FailAssistantExecutionCommand:
+    actor: Actor
+    execution_id: ExecutionId
+    failure_code: str
+    safe_detail: str | None
